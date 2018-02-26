@@ -1,0 +1,93 @@
+//------------------------------------------------
+//--- 010 Editor v8.0.1 Binary Template
+//
+//      File: UFS.bt
+//   Authors: JrMasterModelBuilder
+// Copyright: Copyright (c) 2018 JrMasterModelBuilder
+//   License: MPL-2.0
+//   Version: 1.0
+//   Purpose: Parse SAGE UFS files.
+//  Category: SAGE
+// File Mask: *.FX,*.MDL,*.MOV,*.SFX,*.UFS
+//  ID Bytes: 03 00 00 00 [+4] 01 00 00 00, 03 00 00 00 [+4] 00 00 00 00
+//   History:
+//------------------------------------------------
+
+enum BOOL {
+	BOOL_FALSE = 0,
+	BOOL_TRUE = 1
+};
+
+enum KIND {
+	KIND_EMPTY = 0,
+	KIND_UNCOMPRESSED = 1,
+	KIND_COMPRESSED = 0x41
+};
+
+typedef struct {
+	KIND kind <
+		bgcolor=cAqua,
+		format=hex,
+		comment="0 = empty, 1 = uncompressed, 0x41 = compressed"
+	>;
+	char name[32] <
+		bgcolor=cLtGreen,
+		comment="File name, null terminated"
+	>;
+	ulong offset <
+		bgcolor=cDkBlue,
+		format=hex,
+		comment="File offset"
+	>;
+	ulong size_compressed <
+		bgcolor=cDkBlue,
+		format=hex,
+		comment="Compressed size"
+	>;
+	ulong size_uncompressed <
+		bgcolor=cDkBlue,
+		format=hex,
+		comment="Uncompressed size"
+	>;
+
+	if (
+		kind != KIND_EMPTY &&
+		kind != KIND_UNCOMPRESSED &&
+		kind != KIND_COMPRESSED
+	) {
+		Warning("Unexpected kind.");
+	}
+
+	if (size_compressed) {
+		local ulong tell = FTell();
+		FSeek(offset);
+		char body[size_compressed] <bgcolor=cSilver, comment="Entry data">;
+		FSeek(tell);
+	}
+} ENTRY <optimize=false, comment="File entry">;
+
+typedef struct {
+	ulong magic <bgcolor=cWhite, comment="Always 3">;
+	ulong count <bgcolor=cDkBlue, comment="Entry count">;
+	BOOL valid <bgcolor=cWhite, comment="1 if valid entries, 0 if no entries">;
+	ulong file_size <bgcolor=cDkBlue, format=hex, comment="File size">;
+	char padding[20] <bgcolor=cRed, comment="Padding bytes">;
+} HEADER <comment="File header">;
+
+
+
+
+LittleEndian();
+
+HEADER header;
+
+if (header.magic != 3) {
+	Warning("UFS format check failed.");
+	return -1;
+}
+if (header.file_size != FileSize()) {
+	Warning("UFS size check failed.");
+	return -1;
+}
+
+ENTRY entries[header.count];
